@@ -20,6 +20,7 @@
     "gradient-string": "^2.0.2",
     "moment-timezone": "^0.5.48",
     "socket.io": "^4.8.3",
+    "tough-cookie": "^6.0.1",
     "yt-search": "^2.13.1",
     "ytdl-core": "^4.11.5"
   },
