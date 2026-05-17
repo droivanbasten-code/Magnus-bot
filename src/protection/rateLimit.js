@@ -1,7 +1,6 @@
 /**
- * DAVID V1 — Rate Limit (Layer 7+16+17)
+ * Magnus Bot — Rate Limit (Layer 7+16+17)
  * Copyright © 2025 DJAMEL
- * صمم ليكون مستقراً 100% — لا يسبب انهيار البوت
  */
 "use strict";
 const store = new Map();

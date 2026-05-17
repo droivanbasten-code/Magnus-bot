@@ -2,28 +2,14 @@
  * ╔══════════════════════════════════════════════════════════════════════╗
  * ║       DJAMEL-FCA v3.0 — Facebook Client Abstractions               ║
  * ║       Copyright © 2025 DJAMEL — All rights reserved               ║
- * ║       Built exclusively for DAVID V1 Bot Engine                    ║
+ * ║       Built for Magnus Bot Engine                                   ║
  * ╚══════════════════════════════════════════════════════════════════════╝
- *
- * Features:
- *  ✦ Cookie parsing: c3c, JSON Array, Netscape, Header String, Object
- *  ✦ Live session validation via mbasic.facebook.com
- *  ✦ Human behavior simulation (typing delay, presence simulation)
- *  ✦ User-Agent rotation (8 real mobile agents)
- *  ✦ Cookie deduplication & compression
- *  ✦ sendMessageHuman() — human-like delay before sending
- *  ✦ buildReplyHelper() — GoatBot-compatible message helper
- *  ✦ Exponential backoff login retry
- *  ✦ Auto AppState save after login
- *  ✦ Thread info cache
- *  ✦ Anti-detection headers
  */
 "use strict";
 
 const loginFCA = require("@dongdev/fca-unofficial");
 const axios    = require("axios");
 
-// ─── User-Agent Pool ──────────────────────────────────────────────────────────
 const UA_POOL = [
   "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
   "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
@@ -40,13 +26,10 @@ let _uaIdx = Math.floor(Math.random() * UA_POOL.length);
 const getUA    = () => UA_POOL[_uaIdx];
 const rotateUA = () => { _uaIdx = (_uaIdx + 1) % UA_POOL.length; return UA_POOL[_uaIdx]; };
 
-// ─── Cookie Parser — supports 5 formats ──────────────────────────────────────
-
 function parseCookieInput(raw) {
   if (!raw) return { cookies: [], raw: "" };
   const text = String(raw).trim();
 
-  // 1. JSON Array (standard AppState)
   if (text.startsWith("[")) {
     try {
       const arr = JSON.parse(text);
@@ -61,7 +44,6 @@ function parseCookieInput(raw) {
     } catch (_) {}
   }
 
-  // 2. c3c JSON Object { cookies: [...] }
   if (text.startsWith("{")) {
     try {
       const obj = JSON.parse(text);
@@ -73,9 +55,7 @@ function parseCookieInput(raw) {
         })).filter(c => c.key);
         return { cookies: dedup(mapped), raw: text };
       }
-      // Single cookie obj
       if (obj.key && obj.value) return { cookies: dedup([obj]), raw: text };
-      // Android fbsettings format: { "c_user": "123", "xs": "abc" }
       const keys = ["c_user","xs","fr","wd","datr","sb","m_sess","spin"];
       const found = Object.entries(obj).filter(([k]) => keys.some(kk => k === kk || k.toLowerCase() === kk));
       if (found.length > 0) {
@@ -86,7 +66,6 @@ function parseCookieInput(raw) {
     } catch (_) {}
   }
 
-  // 3. Netscape / Header string: key=value; key2=value2
   if (text.includes("=")) {
     const pairs = text.split(/;\s*/g).filter(Boolean);
     const mapped = pairs.map(p => {
@@ -116,8 +95,6 @@ function hasMandatory(cookies) {
   return keys.has("c_user") && keys.has("xs");
 }
 
-// ─── Session Validator ────────────────────────────────────────────────────────
-
 async function checkLiveCookie(cookieStr, ua) {
   try {
     const res = await axios.get("https://mbasic.facebook.com/settings", {
@@ -140,12 +117,10 @@ async function checkLiveCookie(cookieStr, ua) {
   } catch (_) { return false; }
 }
 
-// ─── Human Behavior ───────────────────────────────────────────────────────────
-
 function calcTypingDelay(text) {
   const len   = String(text || "").replace(/<[^>]*>/g,"").length;
-  const wpm   = 180 + Math.floor(Math.random() * 120);   // 180–300 wpm
-  const chars = wpm * 5 / 60;                             // chars/sec
+  const wpm   = 180 + Math.floor(Math.random() * 120);
+  const chars = wpm * 5 / 60;
   const base  = Math.round((len / chars) * 1000);
   const jit   = (Math.random() - 0.5) * 800;
   return Math.min(Math.max(base + jit, 600), 9000);
@@ -164,8 +139,6 @@ async function simulateTyping(api, threadID, ms) {
   } catch (_) { await new Promise(r => setTimeout(r, delay)); }
 }
 
-// ─── Helper builders ──────────────────────────────────────────────────────────
-
 function buildReplyHelper(api, event) {
   return {
     reply:  async (msg, cb) => {
@@ -179,7 +152,6 @@ function buildReplyHelper(api, event) {
   };
 }
 
-// ─── Thread info cache ────────────────────────────────────────────────────────
 const _threadCache = new Map();
 async function getThreadInfo(api, tid, ttl = 10 * 60000) {
   const cached = _threadCache.get(tid);
@@ -192,8 +164,6 @@ async function getThreadInfo(api, tid, ttl = 10 * 60000) {
     });
   });
 }
-
-// ─── Main Login ──────────────────────────────────────────────────────────────
 
 function login(cookieInput, opts, callback) {
   if (typeof opts === "function") { callback = opts; opts = {}; }
@@ -226,20 +196,15 @@ function login(cookieInput, opts, callback) {
     api.setOptions({ listenEvents: true, selfListen: false, autoReconnect: false, userAgent: UA });
     api.getUID = () => api.getCurrentUserID();
 
-    // Human send
     api.sendMessageHuman = async (msg, tid, cb) => {
       const delay = calcTypingDelay(typeof msg === "string" ? msg : msg?.body || "");
       await simulateTyping(api, tid, delay);
       return api.sendMessage(msg, tid, cb);
     };
 
-    // Reply helper factory
     api.buildReplyHelper = (event) => buildReplyHelper(api, event);
-
-    // Get thread info with cache
     api.getThreadInfoCached = (tid, ttl) => getThreadInfo(api, tid, ttl);
 
-    // Fresh state
     let freshState = appState;
     try { freshState = dedup(api.getAppState() || []); } catch (_) {}
 
@@ -247,7 +212,6 @@ function login(cookieInput, opts, callback) {
   });
 }
 
-// ─── Exports ─────────────────────────────────────────────────────────────────
 module.exports              = login;
 module.exports.login        = login;
 module.exports.parseCookieInput   = parseCookieInput;

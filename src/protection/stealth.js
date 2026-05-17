@@ -1,7 +1,6 @@
 /**
- * DAVID V1 — Stealth Engine (10 تمويه طبقة)
+ * Magnus Bot — Stealth Engine
  * Copyright © 2025 DJAMEL
- * Non-blocking: لا يسبب انهيار البوت أبداً
  */
 "use strict";
 const axios = require("axios");
@@ -17,7 +16,6 @@ const getUA    = () => UA_POOL[_uaIdx];
 const rotateUA = () => { _uaIdx = (_uaIdx+1) % UA_POOL.length; return UA_POOL[_uaIdx]; };
 const rand     = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
 const sleep    = ms => new Promise(r => setTimeout(r, ms));
-
 function isSleepHour() {
   try {
     const cfg = global.GoatBot?.config?.stealth || {};
@@ -27,7 +25,6 @@ function isSleepHour() {
     return s < e ? h >= s && h < e : h >= s || h < e;
   } catch (_) { return false; }
 }
-
 async function presenceLoop() {
   while (_active) {
     try {
@@ -45,7 +42,6 @@ async function presenceLoop() {
     await sleep(rand(8,20) * 60000);
   }
 }
-
 function start(api) { if (_active) return; _api = api; _active = true; presenceLoop().catch(() => {}); }
 function stop()     { _active = false; _api = null; }
 module.exports = { start, stop, getUA, rotateUA };

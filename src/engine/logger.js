@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — Logger
+ * Magnus Bot — Logger
  * Copyright © 2025 DJAMEL
  */
 "use strict";

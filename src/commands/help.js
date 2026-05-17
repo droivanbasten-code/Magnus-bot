@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — /help — قائمة الأوامر بتصميم جميل
+ * Magnus Bot — /help — قائمة الأوامر
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -20,8 +20,8 @@ const COMMANDS_INFO = {
 function buildHelpAll(prefix) {
   const lines = [
     "╔════════════════════════════════════╗",
-    "║       🤖 DAVID V1 — قائمة الأوامر       ║",
-    "║         By DJAMEL | دياميل         ║",
+    "║     🤖 Magnus Bot — قائمة الأوامر      ║",
+    "║         Powered by DJAMEL         ║",
     "╠════════════════════════════════════╣",
     `║  Prefix: ${prefix}                       ║`,
     "╠════════════════════════════════════╣",
@@ -62,7 +62,7 @@ function buildHelpOne(name, prefix) {
   const icon    = info.icon || "•";
 
   const config  = cmd?.config || {};
-  const desc    = config.description || config.longDescription || info.desc || "لا يوجد وصف";
+  const desc    = config.description || info.desc || "لا يوجد وصف";
   const usage   = config.guide?.en?.replace(/\{p[n]?\}/g, prefix) || info.usage || `${prefix}${name}`;
   const aliases = (config.aliases || []).filter(Boolean);
   const cat     = config.category || "admin";
@@ -85,7 +85,7 @@ module.exports = {
   config: {
     name: "help", aliases: ["h","مساعدة","أوامر"], version: "2.0", author: "DJAMEL",
     countDown: 3, role: 2, category: "info",
-    description: "عرض قائمة الأوامر بتصميم جميل",
+    description: "عرض قائمة الأوامر",
     guide: { en: "{pn} — عرض كل الأوامر\n{pn} [اسم الأمر] — تفاصيل أمر" }
   },
 

@@ -1,8 +1,7 @@
 /**
- * DAVID V1 — Global Data Controller
+ * Magnus Bot — Global Data Controller
  * Copyright © DJAMEL
  */
-
 "use strict";
 
 const db = require("../connectDB/connectSqlite.js");

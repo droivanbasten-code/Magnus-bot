@@ -1,7 +1,7 @@
 {
-  "name": "david-v1",
+  "name": "magnus-bot",
   "version": "2.0.0",
-  "description": "DAVID V1 — DjamelBot Engine | Copyright © 2025 DJAMEL",
+  "description": "Magnus Bot — DAVID V1 Engine | Powered by DjamelBot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -20,9 +20,9 @@
     "gradient-string": "^2.0.2",
     "moment-timezone": "^0.5.48",
     "socket.io": "^4.8.3",
-    "tough-cookie": "^6.0.1",
     "yt-search": "^2.13.1",
-    "ytdl-core": "^4.11.5"
+    "ytdl-core": "^4.11.5",
+    "better-sqlite3": "^9.4.3"
   },
   "author": "DJAMEL",
   "license": "UNLICENSED",
@@ -30,8 +30,8 @@
     "facebook",
     "messenger",
     "bot",
+    "Magnus",
     "DAVID",
-    "DJAMEL",
     "chatbot"
   ]
 }

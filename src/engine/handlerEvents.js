@@ -1,12 +1,11 @@
 /**
- * DAVID V1 — Unified Event Handler (WHITE-V3 + Jarfis merged)
+ * Magnus Bot — Unified Event Handler (WHITE-V3 + Jarfis merged)
  * Copyright © 2025 DJAMEL
  */
 "use strict";
 
 const rateLimit = require("../protection/rateLimit");
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
 function getRole(senderID) {
   const cfg     = global.GoatBot?.config || {};
   const sid     = String(senderID);
@@ -35,7 +34,6 @@ function buildMessage(api, event) {
   };
 }
 
-// ─── Anti-Flood (Layer 16 من WHITE-V3) ───────────────────────────────────────────
 function checkFlood(tid, sid) {
   const cfg = global.GoatBot?.config?.rateLimit || {};
   const key = `flood:${tid}:${sid}`;
@@ -43,13 +41,11 @@ function checkFlood(tid, sid) {
   return r.exceeded;
 }
 
-// ─── Anti-Spam (Layer 17) ─────────────────────────────────────────────────────
 function checkSpam(sid) {
   const key = `spam:${sid}`;
   return rateLimit.check(key, 20, 30000).exceeded;
 }
 
-// ─── Reply handler (onReply callbacks) ─────────────────────────────────────────
 async function handleReply(api, event) {
   const replyMap = global.GoatBot?.onReply;
   if (!replyMap?.size) return false;
@@ -72,7 +68,6 @@ async function handleReply(api, event) {
   return false;
 }
 
-// ─── Event handler ─────────────────────────────────────────────────────────────
 async function onEventCmds(api, event, commands) {
   if (!event || !api) return;
   global.lastMqttActivity = Date.now();
@@ -80,13 +75,11 @@ async function onEventCmds(api, event, commands) {
   const { type, senderID, threadID, body = "" } = event;
   if (!senderID || !threadID) return;
 
-  // Dashboard stats
   try {
     if (typeof global._bufferMsg === "function") global._bufferMsg({ ...event, ts: Date.now() });
     if (typeof global._trackMsg  === "function") global._trackMsg(threadID, senderID, body);
   } catch (_) {}
 
-  // onEvent (group events like join/leave/image)
   if (type !== "message" && type !== "message_reply") {
     const allCmds = commands || global.GoatBot?.commands;
     if (allCmds) {
@@ -99,7 +92,6 @@ async function onEventCmds(api, event, commands) {
     return;
   }
 
-  // Handle reply callbacks
   if (type === "message_reply" || event.messageReply) {
     if (await handleReply(api, event)) return;
   }
@@ -107,14 +99,11 @@ async function onEventCmds(api, event, commands) {
   if (type !== "message") return;
   if (!body.trim()) return;
 
-  // DM lock
   if (global.GoatBot?.dmLocked && !event.isGroup) return;
 
-  // Flood + Spam
   if (checkFlood(threadID, senderID)) return;
   if (checkSpam(senderID)) return;
 
-  // Admin-only mode
   const adminOnly = global.GoatBot?.config?.adminOnly?.enable;
   const role      = getRole(senderID);
   if (adminOnly && role < 2) return;
@@ -131,20 +120,17 @@ async function onEventCmds(api, event, commands) {
   const cmd     = allCmds?.get(cmdName);
   if (!cmd) return;
 
-  // Thread-level command control
   try {
     const ctrl = require("../utils/cmdControl");
     if (!ctrl.isEnabled(threadID, cmd.config?.name || cmdName)) return;
   } catch (_) {}
 
-  // Permission check
   const required = cmd.config?.role ?? 2;
   if (role < required) {
     try { await api.sendMessage("⛔ هذا الأمر للأدمن فقط.", threadID); } catch (_) {}
     return;
   }
 
-  // Execute
   const ctx = {
     api, event, args, commandName: cmdName,
     message: buildMessage(api, event),

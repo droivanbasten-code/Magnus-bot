@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — /uptime — وقت تشغيل البوت مع إحصائيات
+ * Magnus Bot — /uptime — وقت تشغيل البوت
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -41,7 +41,7 @@ module.exports = {
     const pong = Date.now() - ping;
 
     const lines = [
-      `╔════ DAVID V1 — Status ════╗`,
+      `╔════ Magnus Bot — Status ════╗`,
       `║ 🤖 Bot ID: ${uid}`,
       `║ ⏱ Uptime: ${formatUptime(upMs)}`,
       `║ 🏓 Ping: ${pong}ms`,

@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — /tik — تنزيل فيديو TikTok بدون علامة مائية
+ * Magnus Bot — /tik — تنزيل فيديو TikTok بدون علامة مائية
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -7,7 +7,7 @@ const axios = require("axios");
 const fs    = require("fs-extra");
 const path  = require("path");
 const os    = require("os");
-const TMP   = path.join(os.tmpdir(), "david_tik");
+const TMP   = path.join(os.tmpdir(), "magnus_tik");
 fs.ensureDirSync(TMP);
 
 const TIKWM = "https://www.tikwm.com/api/feed/search";
@@ -35,16 +35,14 @@ module.exports = {
     if (!input) return message.reply("❗ اكتب كلمة بحث أو رابط TikTok.\nمثال: /tik gojo");
 
     message.react("🔍", event.messageID);
-    const wait = await message.reply(`🔍 جاري البحث في TikTok عن "${input}"…`);
+    const wait = await message.reply(`🔍 جاري البحث عن "${input}"…`);
 
     try {
-      // مسار 1: رابط مباشر → تنزيل مباشر
       if (input.includes("tiktok.com") || input.includes("vm.tiktok")) {
         api.unsendMessage(wait.messageID).catch(()=>{});
         return await this._downloadDirect(api, event, message, input);
       }
 
-      // مسار 2: بحث
       const res = await axios.get(TIKWM, {
         params: { keywords: input, count: 6, cursor: 0, hd: 1 },
         timeout: 15000, headers: { "User-Agent": "Mozilla/5.0" }
@@ -74,7 +72,6 @@ module.exports = {
           const choice = parseInt(replyEvent.body?.trim()) - 1;
           if (isNaN(choice) || choice < 0 || choice >= videos.length)
             return replyMsg.reply("❌ رقم غير صالح.");
-
           const video = videos[choice];
           const dlWait = await replyMsg.reply(`⬇️ جاري التنزيل…`);
           await this._download(api, replyEvent, replyMsg, video, dlWait);
@@ -94,9 +91,8 @@ module.exports = {
       const res   = await axios.get(dlUrl, { responseType: "arraybuffer", timeout: 30000 });
       fs.writeFileSync(outPath, Buffer.from(res.data));
       if (waitMsg) api.unsendMessage(waitMsg.messageID).catch(()=>{});
-
       await api.sendMessage({
-        body: `🎵 ${(video.title||"").slice(0,100)}\n👁 ${fmtViews(video.play_count)} | ⏱ ${fmtDur(video.duration||0)}\n👑 DAVID V1`,
+        body: `🎵 ${(video.title||"").slice(0,100)}\n👁 ${fmtViews(video.play_count)} | ⏱ ${fmtDur(video.duration||0)}\n👑 Magnus Bot`,
         attachment: fs.createReadStream(outPath)
       }, event.threadID);
       fs.removeSync(outPath);
@@ -108,7 +104,7 @@ module.exports = {
   },
 
   _downloadDirect: async function(api, event, message, url) {
-    const dlWait = await message.reply("⬇️ جاري تنزيل الفيديو…");
+    const dlWait  = await message.reply("⬇️ جاري تنزيل الفيديو…");
     const outPath = path.join(TMP, `tik_${Date.now()}.mp4`);
     try {
       const apiRes = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, { timeout: 15000 });
@@ -118,7 +114,7 @@ module.exports = {
       fs.writeFileSync(outPath, Buffer.from(res.data));
       api.unsendMessage(dlWait.messageID).catch(()=>{});
       await api.sendMessage({
-        body: `🎵 ${(data.title||"").slice(0,100)}\n👑 DAVID V1`,
+        body: `🎵 ${(data.title||"").slice(0,100)}\n👑 Magnus Bot`,
         attachment: fs.createReadStream(outPath)
       }, event.threadID);
       fs.removeSync(outPath);

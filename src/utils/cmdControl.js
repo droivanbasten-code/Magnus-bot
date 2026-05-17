@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — Command Control (per-thread enable/disable)
+ * Magnus Bot — Command Control (per-thread enable/disable)
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -27,11 +27,6 @@ let _ctrl = loadCtrl();
 
 function reload() { _ctrl = loadCtrl(); }
 
-/**
- * mode: "blacklist" (default) — all enabled except listed
- *        "whitelist"           — only listed are enabled
- * commands: array of command names
- */
 function getThreadConfig(tid) {
   return _ctrl[String(tid)] || { mode: "blacklist", commands: [] };
 }
@@ -50,7 +45,7 @@ function isEnabled(tid, cmdName) {
   const cfg = getThreadConfig(tid);
   const inList = (cfg.commands || []).map(String).includes(String(cmdName).toLowerCase());
   if (cfg.mode === "whitelist") return inList;
-  return !inList; // blacklist default
+  return !inList;
 }
 
 function getAllThreads() {

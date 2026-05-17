@@ -1,8 +1,3 @@
-/**
- * DAVID V1 — sessionRefresher Protection Layer
- * Copyright © 2025 DJAMEL
- * Non-blocking stub — always safe, never crashes
- */
 "use strict";
 let _active = false, _api = null;
 function start(api)         { try { _active = true; _api = api; } catch(_) {} }

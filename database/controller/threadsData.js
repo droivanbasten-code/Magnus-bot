@@ -1,8 +1,7 @@
 /**
- * DAVID V1 — Threads Data Controller
+ * Magnus Bot — Threads Data Controller
  * Copyright © DJAMEL
  */
-
 "use strict";
 
 const db = require("../connectDB/connectSqlite.js");

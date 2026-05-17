@@ -11,7 +11,7 @@
   "superAdminBot": [61580376967314],
 
   "adminOnly": {
-    "enable": false,
+    "enable": true,
     "note": "عند التفعيل يرد البوت فقط على الأدمن"
   },
 
@@ -65,6 +65,6 @@
 
   "database": {
     "type": "sqlite",
-    "path": "data/david.sqlite"
+    "path": "data/magnus.sqlite"
   }
 }

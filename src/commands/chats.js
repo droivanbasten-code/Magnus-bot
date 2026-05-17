@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — /chats — إدارة المحادثات والغروبات
+ * Magnus Bot — /chats — إدارة المحادثات والغروبات
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -58,7 +58,7 @@ module.exports = {
 
     if (sub === "dm") {
       const action = args[1]?.toLowerCase();
-      if (action === "on")  { setDmLocked(true);  return message.reply("✅ تم تفعيل DM Lock — البوت لن يرد على الرسائل الخاصة."); }
+      if (action === "on")  { setDmLocked(true);  return message.reply("✅ تم تفعيل DM Lock."); }
       if (action === "off") { setDmLocked(false); return message.reply("✅ تم إلغاء DM Lock."); }
       return message.reply(`🔒 DM Lock: ${getDmLocked() ? "مفعل" : "معطل"}\nاستخدم: /chats dm on/off`);
     }

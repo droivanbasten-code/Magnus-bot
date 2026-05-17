@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — Keep Alive (Layer 5)
+ * Magnus Bot — Keep Alive (Layer 5)
  * Copyright © 2025 DJAMEL
  */
 "use strict";

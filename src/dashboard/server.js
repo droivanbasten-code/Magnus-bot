@@ -1,7 +1,6 @@
 /**
- * DAVID V1 — Dashboard Server (Express + Socket.io)
+ * Magnus Bot — Dashboard Server (Express + Socket.io)
  * Copyright © 2025 DJAMEL
- * Features: Password auth, Live logs, Hot-reload config, Command editor
  */
 "use strict";
 
@@ -21,7 +20,7 @@ const CMDS_DIR     = path.join(ROOT, "src/commands");
 
 let _io      = null;
 let _server  = null;
-let _logBuf  = [];          // circular log buffer (last 500 lines)
+let _logBuf  = [];
 const MAX_LOG_BUF = 500;
 
 const stats = {
@@ -32,11 +31,10 @@ const stats = {
   msgLog:        [],
 };
 
-// ── Token store (simple, in-memory) ──────────────────────────────────────────
-const _tokens = new Map();   // token → expiry
+const _tokens = new Map();
 function genToken() {
   const tok = crypto.randomBytes(24).toString("hex");
-  _tokens.set(tok, Date.now() + 8 * 3600 * 1000);  // 8 hours
+  _tokens.set(tok, Date.now() + 8 * 3600 * 1000);
   return tok;
 }
 function validToken(tok) {
@@ -48,11 +46,10 @@ function validToken(tok) {
 function getDashPwd() {
   try {
     const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-    return cfg.dashboard?.password || "david2025";
-  } catch (_) { return "david2025"; }
+    return cfg.dashboard?.password || "magnus2025";
+  } catch (_) { return "magnus2025"; }
 }
 
-// ── Live log interceptor ──────────────────────────────────────────────────────
 function interceptLogs() {
   const origWrite = process.stdout.write.bind(process.stdout);
   const errWrite  = process.stderr.write.bind(process.stderr);
@@ -95,7 +92,7 @@ function getStats() {
     activeUsers:   stats.activeUsers.size,
     commands:      global.GoatBot?.commands?.size || 0,
     botID:         global.GoatBot?.botID  || null,
-    botName:       global.GoatBot?.config?.botName || "DAVID V1",
+    botName:       global.GoatBot?.config?.botName || "Magnus Bot",
     memMB:         +(mem.heapUsed / 1048576).toFixed(1),
     prefix:        global.GoatBot?.config?.prefix || "/",
     protection:    20,
@@ -103,14 +100,12 @@ function getStats() {
   };
 }
 
-// ── Auth middleware ─────────────────────────────────────────────────────────────
 function auth(req, res, next) {
   const tok = req.headers["x-david-token"] || req.query.token;
   if (tok && validToken(tok)) return next();
   res.status(401).json({ ok: false, error: "Unauthorized" });
 }
 
-// ── Dashboard server ──────────────────────────────────────────────────────────
 function startDashboard(port = 5000) {
   const app   = express();
   _server     = http.createServer(app);
@@ -120,7 +115,6 @@ function startDashboard(port = 5000) {
   app.use(bodyParser.urlencoded({ extended: true, limit: "5mb" }));
   app.use(express.static(path.join(__dirname, "public")));
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
   app.post("/api/login", (req, res) => {
     const { password } = req.body;
     if (password === getDashPwd()) {
@@ -136,15 +130,12 @@ function startDashboard(port = 5000) {
     res.json({ ok: true });
   });
   app.get("/api/auth-check", auth, (_, res) => res.json({ ok: true }));
-
-  // ── Stats ───────────────────────────────────────────────────────────────────
   app.get("/api/stats",  auth, (_, res) => res.json(getStats()));
   app.get("/api/status", auth, (_, res) => {
     const online = !!global.GoatBot?.fcaApi && !!global.GoatBot?.botID;
-    res.json({ ok: true, online, botID: global.GoatBot?.botID || null, botName: global.GoatBot?.config?.botName || "DAVID V1" });
+    res.json({ ok: true, online, botID: global.GoatBot?.botID || null, botName: global.GoatBot?.config?.botName || "Magnus Bot" });
   });
 
-  // ── Config ──────────────────────────────────────────────────────────────────
   app.get("/api/config", auth, (_, res) => {
     try {
       const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
@@ -159,7 +150,6 @@ function startDashboard(port = 5000) {
       global._selfWriteConfig = true;
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2));
       setTimeout(() => { global._selfWriteConfig = false; }, 3000);
-      // Hot-apply immediately
       if (global.GoatBot) global.GoatBot.config = updated;
       global.config = updated;
       global.commandPrefix = updated.prefix || "/";
@@ -168,7 +158,6 @@ function startDashboard(port = 5000) {
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
-  // ── Cookies ─────────────────────────────────────────────────────────────────
   app.post("/api/cookies", auth, (req, res) => {
     const raw = req.body?.cookies;
     if (!raw) return res.json({ ok: false, error: "لا توجد بيانات" });
@@ -186,7 +175,6 @@ function startDashboard(port = 5000) {
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
-  // ── Bot Control ──────────────────────────────────────────────────────────────
   app.post("/api/control", auth, (req, res) => {
     const { action } = req.body;
     if (action === "restart") {
@@ -200,33 +188,26 @@ function startDashboard(port = 5000) {
     }
   });
 
-  // ── Commands list ────────────────────────────────────────────────────────────
   app.get("/api/commands", auth, (_, res) => {
     const list = [];
     for (const [name, cmd] of (global.GoatBot?.commands || new Map())) {
       if (cmd?.config?.name?.toLowerCase() === name) {
         list.push({
-          name:        cmd.config.name,
-          aliases:     cmd.config.aliases || [],
-          category:    cmd.config.category  || "other",
-          role:        cmd.config.role       ?? 2,
-          description: cmd.config.description || "",
-          version:     cmd.config.version    || "1.0",
+          name: cmd.config.name, aliases: cmd.config.aliases || [],
+          category: cmd.config.category || "other", role: cmd.config.role ?? 2,
+          description: cmd.config.description || "", version: cmd.config.version || "1.0",
         });
       }
     }
     res.json({ ok: true, commands: list });
   });
 
-  // ── Command source (editor) ──────────────────────────────────────────────────
   app.get("/api/commands/:name/source", auth, (req, res) => {
     const name = req.params.name.toLowerCase().replace(/[^a-z0-9_-]/g, "");
     const file = path.join(CMDS_DIR, `${name}.js`);
     if (!fs.existsSync(file)) return res.json({ ok: false, error: "الأمر غير موجود" });
-    try {
-      const code = fs.readFileSync(file, "utf8");
-      res.json({ ok: true, name, code });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
+    try { res.json({ ok: true, name, code: fs.readFileSync(file, "utf8") }); }
+    catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
   app.post("/api/commands/:name/source", auth, (req, res) => {
@@ -234,50 +215,30 @@ function startDashboard(port = 5000) {
     const { code } = req.body;
     if (!code) return res.json({ ok: false, error: "الكود فارغ" });
     const file = path.join(CMDS_DIR, `${name}.js`);
-    try {
-      // Syntax check
-      new Function(code);
-    } catch (syntaxErr) {
-      return res.json({ ok: false, error: "خطأ في الكود: " + syntaxErr.message });
-    }
+    try { new Function(code); } catch (syntaxErr) { return res.json({ ok: false, error: "خطأ في الكود: " + syntaxErr.message }); }
     try {
       fs.writeFileSync(file, code, "utf8");
-      // Hot-reload
       const absPath = require.resolve(file);
       delete require.cache[absPath];
       const cmd = require(file);
       if (cmd?.config?.name) {
         const n = cmd.config.name.toLowerCase();
         global.GoatBot.commands.set(n, cmd);
-        if (cmd.config.aliases) {
-          for (const a of cmd.config.aliases) {
-            if (a) global.GoatBot.commands.set(String(a).toLowerCase(), cmd);
-          }
-        }
+        if (cmd.config.aliases) for (const a of cmd.config.aliases) if (a) global.GoatBot.commands.set(String(a).toLowerCase(), cmd);
         if (_io) _io.emit("command-updated", { name: n });
-        res.json({ ok: true, message: `✅ تم تحديث /${n} بدون إعادة تشغيل` });
-      } else {
-        res.json({ ok: false, error: "config.name مفقود في الأمر" });
-      }
+        res.json({ ok: true, message: `✅ تم تحديث /${n}` });
+      } else { res.json({ ok: false, error: "config.name مفقود" }); }
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
-  // ── Thread command control ──────────────────────────────────────────────────
   app.get("/api/thread-commands", auth, (_, res) => {
-    try {
-      const ctrl = require("../utils/cmdControl");
-      ctrl.reload();
-      res.json({ ok: true, data: ctrl.getAll() });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
+    try { const ctrl = require("../utils/cmdControl"); ctrl.reload(); res.json({ ok: true, data: ctrl.getAll() }); }
+    catch (e) { res.json({ ok: false, error: e.message }); }
   });
-
   app.get("/api/thread-commands/:tid", auth, (req, res) => {
-    try {
-      const ctrl = require("../utils/cmdControl");
-      res.json({ ok: true, config: ctrl.getThreadConfig(req.params.tid) });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
+    try { const ctrl = require("../utils/cmdControl"); res.json({ ok: true, config: ctrl.getThreadConfig(req.params.tid) }); }
+    catch (e) { res.json({ ok: false, error: e.message }); }
   });
-
   app.post("/api/thread-commands/:tid", auth, (req, res) => {
     try {
       const ctrl = require("../utils/cmdControl");
@@ -287,104 +248,49 @@ function startDashboard(port = 5000) {
       res.json({ ok: true });
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
-
   app.delete("/api/thread-commands/:tid", auth, (req, res) => {
-    try {
-      const ctrl = require("../utils/cmdControl");
-      ctrl.resetThread(req.params.tid);
-      res.json({ ok: true });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
+    try { const ctrl = require("../utils/cmdControl"); ctrl.resetThread(req.params.tid); res.json({ ok: true }); }
+    catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
-  // ── Threads list (known threads from bot) ───────────────────────────────────
   app.get("/api/threads", auth, (_, res) => {
     try {
       const threads = [];
       const allData = global.GoatBot?.allThreadData || {};
       for (const [tid, data] of Object.entries(allData)) {
-        threads.push({ tid, name: data?.threadName || data?.name || `غروب ${tid}`, type: data?.isGroup ? "group" : "dm" });
-      }
-      const ctrl = require("../utils/cmdControl");
-      const ctrlTids = ctrl.getAllThreads();
-      for (const tid of ctrlTids) {
-        if (!threads.find(t => t.tid === tid)) threads.push({ tid, name: `غروب ${tid}`, type: "group" });
+        threads.push({ tid, name: data?.threadName || data?.name || `Thread ${tid}`, type: data?.isGroup ? "group" : "dm" });
       }
       res.json({ ok: true, threads });
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
-  // ── Command quick-update (rename / aliases / description) ───────────────────
-  app.post("/api/commands/:name/update-meta", auth, (req, res) => {
-    const nameParam = req.params.name.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    const { newName, aliases, description, role, guide } = req.body;
-    const file = path.join(CMDS_DIR, `${nameParam}.js`);
-    if (!fs.existsSync(file)) return res.json({ ok: false, error: "الأمر غير موجود" });
-    try {
-      let code = fs.readFileSync(file, "utf8");
-      if (newName && newName !== nameParam) {
-        code = code.replace(/name:\s*["']([^"']+)["']/, `name: "${newName}"`);
-      }
-      if (Array.isArray(aliases)) {
-        code = code.replace(/aliases:\s*\[([^\]]*)\]/, `aliases: ${JSON.stringify(aliases)}`);
-      }
-      if (description) {
-        code = code.replace(/description:\s*["']([^"']*)["']/, `description: "${description.replace(/"/g,'\\"')}"`);
-      }
-      if (role !== undefined) {
-        code = code.replace(/role:\s*\d/, `role: ${parseInt(role) || 2}`);
-      }
-      if (guide) {
-        code = code.replace(/guide:\s*\{[^}]*\}/, `guide: { en: "${guide.replace(/"/g,'\\"').replace(/\n/g,'\\n')}" }`);
-      }
-      fs.writeFileSync(file, code, "utf8");
-      const absPath = require.resolve(file);
-      delete require.cache[absPath];
-      const cmd = require(file);
-      const finalName = (cmd?.config?.name || nameParam).toLowerCase();
-      if (global.GoatBot?.commands) {
-        if (newName && newName !== nameParam) global.GoatBot.commands.delete(nameParam);
-        global.GoatBot.commands.set(finalName, cmd);
-        if (cmd.config.aliases) for (const a of cmd.config.aliases||[]) if (a) global.GoatBot.commands.set(String(a).toLowerCase(), cmd);
-      }
-      if (_io) _io.emit("command-updated", { name: finalName });
-      res.json({ ok: true, name: finalName, message: `✅ تم تحديث /${finalName}` });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
-  });
-
-  // ── Messages log ─────────────────────────────────────────────────────────────
   app.get("/api/messages", auth, (_, res) => {
     res.json({ ok: true, messages: [...stats.msgLog].reverse().slice(0, 30) });
   });
 
-  // ── Live logs ────────────────────────────────────────────────────────────────
   app.get("/api/logs", auth, (_, res) => {
     res.json({ ok: true, logs: _logBuf.slice(-200) });
   });
 
-  // ── WebSocket ─────────────────────────────────────────────────────────────────
   _io.on("connection", socket => {
     const tok = socket.handshake.query?.token;
     if (!validToken(tok)) { socket.disconnect(); return; }
-
     socket.emit("stats-update", getStats());
     socket.emit("bot-status", {
       status:  global.GoatBot?.fcaApi ? "online" : "offline",
       uid:     global.GoatBot?.botID  || null,
-      botName: global.GoatBot?.config?.botName || "DAVID V1",
+      botName: global.GoatBot?.config?.botName || "Magnus Bot",
     });
-    // Send last 100 log lines
     socket.emit("log-history", _logBuf.slice(-100));
-
     socket.on("ping-bot", () => socket.emit("pong-bot", { ts: Date.now() }));
   });
 
-  // ── Catch-all SPA ─────────────────────────────────────────────────────────────
   app.get("*", (_, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
   _server.listen(port, "0.0.0.0", () => {
     console.log();
     console.log(chalk.cyan("  ╔══════════════════════════════════════════╗"));
-    console.log(chalk.cyan(`  ║  🌐 Dashboard: http://0.0.0.0:${port}       ║`));
+    console.log(chalk.cyan(`  ║  🌐 Magnus Dashboard: http://0.0.0.0:${port}  ║`));
     console.log(chalk.cyan("  ╚══════════════════════════════════════════╝"));
     console.log();
   });

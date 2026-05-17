@@ -1,8 +1,7 @@
 /**
- * DAVID V1 — Database Controller Index
+ * Magnus Bot — Database Controller Index
  * Copyright © DJAMEL
  */
-
 "use strict";
 
 const threadsData = require("./threadsData.js");

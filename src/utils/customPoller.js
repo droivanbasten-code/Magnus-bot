@@ -1,9 +1,8 @@
 /**
- * DAVID V1 — Custom HTTP Poller (fallback for MQTT)
+ * Magnus Bot — Custom HTTP Poller (fallback for MQTT)
  * Copyright © 2025 DJAMEL
  */
 "use strict";
-const axios = require("axios");
 
 let _active = false;
 let _timer  = null;
@@ -22,7 +21,6 @@ function startPoller(api, handlerFn, intervalMs = 6000) {
   async function poll() {
     if (!_active) return;
     try {
-      // graphql thread list as keepalive + event source
       const threads = await new Promise((res, rej) => {
         api.getThreadList(3, null, ["INBOX"], (e, d) => e ? rej(e) : res(d));
       });

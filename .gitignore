@@ -1,8 +1,8 @@
 node_modules/
-account.txt
 data/
-database/data/
+database/data/*.sqlite
+database/data/*.sqlite-shm
+database/data/*.sqlite-wal
+account.txt
 *.log
 .env
-.local/
-*.sqlite

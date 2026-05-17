@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════╗
- * ║         DAVID V1 — Watchdog (مراقب العملية)                    ║
+ * ║         Magnus Bot — Watchdog (مراقب العملية)                   ║
  * ║         Copyright © 2025 DJAMEL — All rights reserved          ║
  * ╚══════════════════════════════════════════════════════════════════╝
  */
@@ -30,7 +30,7 @@ function start() {
   }
 
   restarts++;
-  log(`تشغيل DAVID V1... (محاولة ${restarts})`);
+  log(`تشغيل Magnus Bot... (محاولة ${restarts})`);
 
   child = spawn(process.execPath, [path.join(__dirname, "David.js")], {
     stdio: "inherit",

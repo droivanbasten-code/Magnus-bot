@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — Core Globals (GoatBot Pattern)
+ * Magnus Bot — Core Globals (GoatBot Pattern)
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -30,7 +30,6 @@ function initGlobals(config) {
 
   global.db = { allThreadData: [], allUserData: [] };
 
-  // utils globaux
   const fca = require("../../Djamel-fca");
   global.utils = {
     calcHumanTypingDelay: fca.calcTypingDelay,
@@ -42,7 +41,6 @@ function initGlobals(config) {
     rand:    (a, b) => Math.floor(Math.random() * (b - a + 1)) + a,
   };
 
-  // Clean expired onReply entries every 5 min
   setInterval(() => {
     const now = Date.now();
     const timeout = global.GoatBot?._replyTimeout || 1800000;
@@ -51,7 +49,6 @@ function initGlobals(config) {
     }
   }, 5 * 60 * 1000);
 
-  // Aliases
   global.log           = global.utils.log;
   global.config        = config;
   global.ownerID       = config.ownerID || "";

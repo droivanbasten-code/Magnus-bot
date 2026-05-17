@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — /divel — رسائل دورية للغروب مع انتظار عشوائي
+ * Magnus Bot — /divel — رسائل دورية للغروب مع انتظار عشوائي
  * Copyright © 2025 DJAMEL
  */
 "use strict";
@@ -11,12 +11,13 @@ function load() { try { if(fs.existsSync(DATA)) return JSON.parse(fs.readFileSyn
 function save(d) { fs.ensureDirSync(path.dirname(DATA)); fs.writeFileSync(DATA,JSON.stringify(d,null,2)); }
 function isAdmin(id) { return (global.GoatBot?.config?.adminBot||[]).map(String).includes(String(id)); }
 
+if (!global.GoatBot) global.GoatBot = {};
 if (!global.GoatBot.divelWatchers) global.GoatBot.divelWatchers = {};
 
 async function humanSend(api, tid, msg) {
   const delay = global.utils?.calcHumanTypingDelay?.(msg) || 1500;
   await global.utils?.simulateTyping?.(api, tid, delay);
-  await api.sendMessage({ body: msg, isDaydreamMode: true }, tid);
+  await api.sendMessage({ body: msg }, tid);
 }
 
 function scheduleNext(api, tid, td) {
@@ -33,14 +34,6 @@ function scheduleNext(api, tid, td) {
   global.GoatBot.divelWatchers[tid] = { ...td, timer };
 }
 
-function restoreAll(api) {
-  if (global.GoatBot._divelRestored) return;
-  global.GoatBot._divelRestored = true;
-  const data = load();
-  for (const [tid, td] of Object.entries(data))
-    if (td.active && td.message) scheduleNext(api, tid, td);
-}
-
 module.exports = {
   config: {
     name: "divel", aliases: ["dv"], version: "2.0", author: "DJAMEL",
@@ -52,7 +45,6 @@ module.exports = {
   onStart: async function({ api, event, args, message }) {
     const tid = event.threadID;
     if (!isAdmin(event.senderID)) return message.reply("⛔ للأدمن فقط.");
-    restoreAll(api);
     const data = load();
     const sub  = args[0]?.toLowerCase();
 

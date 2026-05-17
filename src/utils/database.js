@@ -1,5 +1,5 @@
 /**
- * DAVID V1 — Database Init
+ * Magnus Bot — Database Init
  * Copyright © 2025 DJAMEL
  */
 "use strict";
