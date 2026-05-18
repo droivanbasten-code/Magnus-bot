@@ -44,6 +44,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',sans-serif;min-
 .btn-danger{background:var(--red);color:#fff}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--t2)}
 .btn-warn{background:var(--yellow);color:#000}
+.btn-sm{padding:4px 10px;font-size:11px;border-radius:6px}
 .btn:hover{opacity:.85;transform:translateY(-1px)}
 .form-group{margin-bottom:12px}
 .form-group label{display:block;font-size:12px;color:var(--t2);margin-bottom:5px}
@@ -97,6 +98,16 @@ input:checked + .slider:before{transform:translateX(20px)}
 .prot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 .prot-item{background:#0f172a;border:1px solid var(--green);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;align-items:center;gap:6px}
 .prot-item::before{content:"🛡";font-size:14px}
+.admin-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:200px;overflow-y:auto}
+.admin-item{display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:8px 12px}
+.admin-item.owner{border-color:var(--yellow)}
+.admin-id{font-family:monospace;font-size:12px;color:var(--t1)}
+.admin-badge{font-size:10px;color:var(--yellow);margin-right:6px}
+.admin-add-row{display:flex;gap:8px;margin-top:6px}
+.admin-add-row input{flex:1}
+.live-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:2px 8px;margin-right:8px}
+.live-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
 </head>
 <body>
@@ -156,6 +167,7 @@ input:checked + .slider:before{transform:translateX(20px)}
     <button class="tab active" data-tab="control">🎮 التحكم</button>
     <button class="tab" data-tab="cookies">🍪 الكوكيز</button>
     <button class="tab" data-tab="commands">📦 الأوامر</button>
+    <button class="tab" data-tab="admins">👑 الأدمن</button>
     <button class="tab" data-tab="protection">🛡 الحماية</button>
     <button class="tab" data-tab="settings">⚙️ الإعدادات</button>
     <button class="tab" data-tab="messages">📨 الرسائل</button>
@@ -194,6 +206,46 @@ input:checked + .slider:before{transform:translateX(20px)}
       <div class="card-title">قائمة الأوامر — <span id="cmdTotal">0</span> أمر</div>
       <input class="search-input" id="cmd-search" type="text" placeholder="🔍 بحث…" oninput="filterCommands()">
       <div class="cmd-grid" id="cmdGrid"><p style="color:var(--t2);font-size:13px;">جاري التحميل…</p></div>
+    </div>
+  </div>
+
+  <div class="tab-pane" id="tab-admins">
+    <div class="card section">
+      <div class="card-title">
+        <span class="live-badge">مباشر</span>
+        مالك البوت
+      </div>
+      <div class="admin-list" id="owner-list"></div>
+      <div class="settings-section-title" style="margin-top:8px;">تغيير المالك</div>
+      <div class="admin-add-row">
+        <input type="text" id="new-owner-id" placeholder="أدخل ID الجديد للمالك" maxlength="30">
+        <button class="btn btn-warn btn-sm" onclick="setOwner()">👑 تعيين مالك</button>
+      </div>
+    </div>
+
+    <div class="card section">
+      <div class="card-title">
+        <span class="live-badge">مباشر</span>
+        السوبر أدمن
+      </div>
+      <div class="admin-list" id="super-admin-list"></div>
+      <div class="admin-add-row">
+        <input type="text" id="new-super-id" placeholder="أضف ID سوبر أدمن" maxlength="30">
+        <button class="btn btn-primary btn-sm" onclick="addAdmin('super')">➕ إضافة</button>
+      </div>
+    </div>
+
+    <div class="card section">
+      <div class="card-title">
+        <span class="live-badge">مباشر</span>
+        الأدمن
+      </div>
+      <div class="admin-list" id="admin-list"></div>
+      <div class="admin-add-row">
+        <input type="text" id="new-admin-id" placeholder="أضف ID أدمن" maxlength="30">
+        <button class="btn btn-primary btn-sm" onclick="addAdmin('admin')">➕ إضافة</button>
+      </div>
+      <div class="hint" style="margin-top:10px;">⚠️ البوت يرد فقط على الأدمن والسوبر أدمن والمالك. أي شخص غير مسجل يتم تجاهله تلقائياً.</div>
     </div>
   </div>
 
@@ -258,6 +310,7 @@ let _socket = null;
 let _autoScroll = true;
 let _logLines = [];
 let _allCmds = [];
+let _adminsData = { ownerID: "", adminBot: [], superAdminBot: [] };
 
 async function apiFetch(url, opts = {}, useAuth = true) {
   const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
@@ -305,32 +358,33 @@ async function showApp() {
   if (!ok) { _token = ""; localStorage.removeItem("magnus_token"); return; }
   document.getElementById("login-screen").classList.add("hidden");
   initSocket();
-  await refreshStats();
-  await loadSettings();
+  await Promise.all([refreshStats(), loadSettings(), loadAdmins()]);
   loadProtections();
 }
 
 function initSocket() {
   if (_socket) _socket.disconnect();
   _socket = io({ query: { token: _token } });
-  _socket.on("bot-status", d => updateStatus(d));
-  _socket.on("stats-update", d => renderStats(d));
-  _socket.on("log-line", d => addLogLine(d));
-  _socket.on("log-history", logs => { _logLines = []; document.getElementById("logBox").innerHTML = ""; logs.forEach(addLogLine); });
-  _socket.on("connect_error", () => {});
+  _socket.on("bot-status",     d => updateStatus(d));
+  _socket.on("stats-update",   d => renderStats(d));
+  _socket.on("log-line",       d => addLogLine(d));
+  _socket.on("log-history",    logs => { _logLines = []; document.getElementById("logBox").innerHTML = ""; logs.forEach(addLogLine); });
+  _socket.on("admin-updated",  d => renderAdmins(d));
+  _socket.on("config-reloaded",d => { loadSettings(); if (d.config) { const c = d.config; if(c.botName){const el=document.getElementById("botName");if(el)el.textContent=c.botName;} } });
+  _socket.on("connect_error",  () => {});
 }
 
 function updateStatus(d) {
-  const pill = document.getElementById("statusPill");
-  const txt  = document.getElementById("statusText");
-  const bsEl = document.getElementById("botStatus");
+  const pill  = document.getElementById("statusPill");
+  const txt   = document.getElementById("statusText");
+  const bsEl  = document.getElementById("botStatus");
   const uidEl = document.getElementById("botUID");
-  const nameEl = document.getElementById("botName");
+  const nameEl= document.getElementById("botName");
   const online = d.status === "online";
   pill.className = "status-pill" + (online ? " online" : "");
   txt.textContent = online ? "متصل ✔" : d.status === "connecting" ? "جاري الاتصال…" : "غير متصل";
-  if (bsEl) bsEl.textContent = online ? `متصل — UID: ${d.uid||""}` : (d.message || "غير متصل");
-  if (uidEl && d.uid) uidEl.textContent = d.uid;
+  if (bsEl)  bsEl.textContent  = online ? `متصل — UID: ${d.uid||""}` : (d.message || "غير متصل");
+  if (uidEl && d.uid)  uidEl.textContent  = d.uid;
   if (nameEl && d.botName) nameEl.textContent = d.botName;
 }
 
@@ -448,6 +502,79 @@ async function saveSettings() {
   toast(r.ok ? "✅ تم حفظ الإعدادات" : "❌ " + r.error, r.ok ? "success" : "error");
 }
 
+async function loadAdmins() {
+  const r = await apiFetch("/api/admins");
+  if (r.ok) renderAdmins(r);
+}
+
+function renderAdmins(data) {
+  if (!data) return;
+  _adminsData = data;
+  const ownerID     = String(data.ownerID || "");
+  const adminBot    = (data.adminBot     || []).map(String);
+  const superAdmins = (data.superAdminBot|| []).map(String);
+
+  const ownerEl = document.getElementById("owner-list");
+  if (ownerEl) {
+    ownerEl.innerHTML = ownerID
+      ? `<div class="admin-item owner"><span class="admin-id">👑 ${esc(ownerID)}</span><span style="font-size:10px;color:var(--yellow)">مالك</span></div>`
+      : `<div style="color:var(--t2);font-size:12px;padding:8px;">لا يوجد مالك محدد</div>`;
+  }
+
+  const superEl = document.getElementById("super-admin-list");
+  if (superEl) {
+    const filtered = superAdmins.filter(id => id !== ownerID);
+    superEl.innerHTML = filtered.length
+      ? filtered.map(id => `<div class="admin-item"><span class="admin-id">⭐ ${esc(id)}</span><button class="btn btn-danger btn-sm" onclick="removeAdmin('${esc(id)}','super')">🗑</button></div>`).join("")
+      : `<div style="color:var(--t2);font-size:12px;padding:8px;">لا يوجد سوبر أدمن بعد</div>`;
+  }
+
+  const adminEl = document.getElementById("admin-list");
+  if (adminEl) {
+    const filtered = adminBot.filter(id => id !== ownerID);
+    adminEl.innerHTML = filtered.length
+      ? filtered.map(id => `<div class="admin-item"><span class="admin-id">🔑 ${esc(id)}</span><button class="btn btn-danger btn-sm" onclick="removeAdmin('${esc(id)}','admin')">🗑</button></div>`).join("")
+      : `<div style="color:var(--t2);font-size:12px;padding:8px;">لا يوجد أدمن بعد</div>`;
+  }
+}
+
+async function addAdmin(type) {
+  const inputId = type === "super" ? "new-super-id" : "new-admin-id";
+  const id = document.getElementById(inputId)?.value?.trim();
+  if (!id) return toast("❗ أدخل ID أولاً", "error");
+  const r = await apiFetch("/api/admins/add", { method: "POST", body: JSON.stringify({ id, type }) });
+  if (r.ok) {
+    document.getElementById(inputId).value = "";
+    renderAdmins(r);
+    toast(`✅ تم إضافة ${id}`, "success");
+  } else {
+    toast("❌ " + r.error, "error");
+  }
+}
+
+async function removeAdmin(id, type) {
+  const r = await apiFetch("/api/admins/remove", { method: "POST", body: JSON.stringify({ id, type }) });
+  if (r.ok) {
+    renderAdmins(r);
+    toast(`✅ تم إزالة ${id}`, "success");
+  } else {
+    toast("❌ " + r.error, "error");
+  }
+}
+
+async function setOwner() {
+  const id = document.getElementById("new-owner-id")?.value?.trim();
+  if (!id) return toast("❗ أدخل ID المالك الجديد", "error");
+  const r = await apiFetch("/api/admins/set-owner", { method: "POST", body: JSON.stringify({ id }) });
+  if (r.ok) {
+    document.getElementById("new-owner-id").value = "";
+    renderAdmins(r);
+    toast(`✅ تم تعيين ${id} كمالك جديد`, "success");
+  } else {
+    toast("❌ " + r.error, "error");
+  }
+}
+
 async function loadMessages() {
   const r = await apiFetch("/api/messages");
   const el = document.getElementById("msgLog");
@@ -498,6 +625,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     if (t === "settings")   loadSettings();
     if (t === "messages")   loadMessages();
     if (t === "logs")       loadLogsHistory();
+    if (t === "admins")     loadAdmins();
   });
 });
 
