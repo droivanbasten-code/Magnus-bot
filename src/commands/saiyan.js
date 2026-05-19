@@ -18,7 +18,7 @@ module.exports = {
   config: {
     name: "سايان",
     version: "1.0",
-    author: "DJAMEL",
+    author: "MAGNUS",
     role: 2,
     description: "نظام Magnus X Saiyan الكامل",
     category: "system",
