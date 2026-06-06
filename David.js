@@ -189,6 +189,7 @@ function startProtection(api) {
     { mod: "./src/protection/duplicateGuard",   fn: "start" },
     { mod: "./src/protection/typingVariator",   fn: "start" },
     { mod: "./src/protection/Uprotection",      fn: "start" },
+    { mod: "./src/protection/cookieRefresher",  fn: "start" },
   ];
   let active = 0;
   for (const { mod, fn } of layers) {
@@ -198,7 +199,7 @@ function startProtection(api) {
       active++;
     } catch (_) {}
   }
-  log.ok("PROTECTION", `🛡️  ${active + 4}/20 طبقة حماية نشطة ✔`);
+  log.ok("PROTECTION", `🛡️  ${active + 4}/21 طبقة حماية نشطة ✔`);
 }
 
 function stopProtection() {

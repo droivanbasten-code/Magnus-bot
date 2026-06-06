@@ -100,28 +100,6 @@ function getStats() {
   };
 }
 
-function readConfig() {
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-}
-
-function writeConfig(cfg) {
-  global._selfWriteConfig = true;
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
-  setTimeout(() => { global._selfWriteConfig = false; }, 3000);
-  if (global.GoatBot) global.GoatBot.config = cfg;
-  global.config = cfg;
-  global.commandPrefix = cfg.prefix || "/";
-}
-
-function getAdmins() {
-  const cfg = global.GoatBot?.config || readConfig();
-  return {
-    ownerID:      String(cfg.ownerID || ""),
-    adminBot:     (cfg.adminBot     || []).map(String),
-    superAdminBot:(cfg.superAdminBot|| []).map(String),
-  };
-}
-
 function auth(req, res, next) {
   const tok = req.headers["x-david-token"] || req.query.token;
   if (tok && validToken(tok)) return next();
@@ -160,84 +138,23 @@ function startDashboard(port = 5000) {
 
   app.get("/api/config", auth, (_, res) => {
     try {
-      const cfg = readConfig();
+      const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
       if (cfg.facebookAccount) cfg.facebookAccount.password = "";
       res.json({ ok: true, config: cfg });
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
-
   app.post("/api/config", auth, (req, res) => {
     try {
-      const old = readConfig();
+      const old = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
       const updated = Object.assign({}, old, req.body);
-      writeConfig(updated);
-      if (_io) _io.emit("config-reloaded", { ts: Date.now(), config: updated });
-      if (_io) _io.emit("admin-updated", getAdmins());
+      global._selfWriteConfig = true;
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2));
+      setTimeout(() => { global._selfWriteConfig = false; }, 3000);
+      if (global.GoatBot) global.GoatBot.config = updated;
+      global.config = updated;
+      global.commandPrefix = updated.prefix || "/";
+      if (_io) _io.emit("config-reloaded", { ts: Date.now() });
       res.json({ ok: true });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
-  });
-
-  app.get("/api/admins", auth, (_, res) => {
-    try { res.json({ ok: true, ...getAdmins() }); }
-    catch (e) { res.json({ ok: false, error: e.message }); }
-  });
-
-  app.post("/api/admins/add", auth, (req, res) => {
-    try {
-      const { id, type } = req.body;
-      if (!id) return res.json({ ok: false, error: "id مطلوب" });
-      const sid = String(id).trim();
-      const cfg = readConfig();
-      const field = type === "super" ? "superAdminBot" : "adminBot";
-      if (!Array.isArray(cfg[field])) cfg[field] = [];
-      const list = cfg[field].map(String);
-      if (!list.includes(sid)) {
-        cfg[field].push(Number(sid) || sid);
-      }
-      writeConfig(cfg);
-      const admins = getAdmins();
-      if (_io) _io.emit("admin-updated", admins);
-      if (_io) _io.emit("config-reloaded", { ts: Date.now(), config: cfg });
-      res.json({ ok: true, ...admins });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
-  });
-
-  app.post("/api/admins/remove", auth, (req, res) => {
-    try {
-      const { id, type } = req.body;
-      if (!id) return res.json({ ok: false, error: "id مطلوب" });
-      const sid = String(id).trim();
-      const cfg = readConfig();
-      const ownerID = String(cfg.ownerID || "");
-      if (sid === ownerID) return res.json({ ok: false, error: "لا يمكن إزالة مالك البوت" });
-      const field = type === "super" ? "superAdminBot" : "adminBot";
-      if (Array.isArray(cfg[field])) {
-        cfg[field] = cfg[field].filter(x => String(x) !== sid);
-      }
-      writeConfig(cfg);
-      const admins = getAdmins();
-      if (_io) _io.emit("admin-updated", admins);
-      if (_io) _io.emit("config-reloaded", { ts: Date.now(), config: cfg });
-      res.json({ ok: true, ...admins });
-    } catch (e) { res.json({ ok: false, error: e.message }); }
-  });
-
-  app.post("/api/admins/set-owner", auth, (req, res) => {
-    try {
-      const { id } = req.body;
-      if (!id) return res.json({ ok: false, error: "id مطلوب" });
-      const sid = String(id).trim();
-      const cfg = readConfig();
-      cfg.ownerID = sid;
-      if (!Array.isArray(cfg.superAdminBot)) cfg.superAdminBot = [];
-      if (!cfg.superAdminBot.map(String).includes(sid)) cfg.superAdminBot.push(Number(sid) || sid);
-      if (!Array.isArray(cfg.adminBot)) cfg.adminBot = [];
-      if (!cfg.adminBot.map(String).includes(sid)) cfg.adminBot.push(Number(sid) || sid);
-      writeConfig(cfg);
-      const admins = getAdmins();
-      if (_io) _io.emit("admin-updated", admins);
-      if (_io) _io.emit("config-reloaded", { ts: Date.now(), config: cfg });
-      res.json({ ok: true, ...admins });
     } catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
@@ -269,6 +186,21 @@ function startDashboard(port = 5000) {
     } else {
       res.json({ ok: false, error: "action غير معروف" });
     }
+  });
+
+  app.get("/api/cookie-refresh/status", auth, (_, res) => {
+    try {
+      const cr = require("../protection/cookieRefresher");
+      res.json({ ok: true, ...cr.getStatus() });
+    } catch (e) { res.json({ ok: false, error: e.message }); }
+  });
+
+  app.post("/api/cookie-refresh/force", auth, async (_, res) => {
+    try {
+      const cr = require("../protection/cookieRefresher");
+      const ok = await cr.forceRefresh();
+      res.json({ ok, message: ok ? "✅ تم التجديد بنجاح" : "⚠️ التجديد فشل أو البوت غير متصل" });
+    } catch (e) { res.json({ ok: false, error: e.message }); }
   });
 
   app.get("/api/commands", auth, (_, res) => {
@@ -365,7 +297,6 @@ function startDashboard(port = 5000) {
       botName: global.GoatBot?.config?.botName || "Magnus Bot",
     });
     socket.emit("log-history", _logBuf.slice(-100));
-    socket.emit("admin-updated", getAdmins());
     socket.on("ping-bot", () => socket.emit("pong-bot", { ts: Date.now() }));
   });
 
