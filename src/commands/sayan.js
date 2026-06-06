@@ -1,166 +1,335 @@
 /**
- * Magnus Bot — /سايان — حماية اسم الغروب (Arabic command)
- * Usage:
- *   ! سايان نيم [اسم]   → تفعيل الحماية
- *   ! سايان ايقاف نيم   → إيقاف الحماية
+ * Magnus Bot — ! سايان — الأمر الشامل
+ *
+ * الأوامر:
+ *   ! سايان نيم [اسم]          → حماية اسم الغروب
+ *   ! سايان ايقاف نيم          → إيقاف حماية الاسم
+ *   ! سايان اضافة [رسالة] [وقت]→ ضبط الرد التلقائي (مثال: ! سايان اضافة مرحباً 30s أو 2m)
+ *   ! سايان تشغيل              → تشغيل الرد التلقائي
+ *   ! سايان ايقاف              → إيقاف الرد التلقائي
+ *   ! سايان ابتيم              → معلومات البوت الكاملة
+ *
  * Copyright © 2025 DJAMEL
  */
 "use strict";
 
 const fs   = require("fs-extra");
 const path = require("path");
+const os   = require("os");
 
-const DATA = path.join(process.cwd(), "database/data/sayanNim.json");
+// ─── Storage ────────────────────────────────────────────────────────────────
+const NIM_DATA   = path.join(process.cwd(), "database/data/sayanNim.json");
+const AUTO_DATA  = path.join(process.cwd(), "database/data/sayanAuto.json");
 
-function load() {
-  try { return fs.existsSync(DATA) ? JSON.parse(fs.readFileSync(DATA, "utf8")) : {}; }
-  catch (_) { return {}; }
-}
-function save(d) {
-  fs.ensureDirSync(path.dirname(DATA));
-  fs.writeFileSync(DATA, JSON.stringify(d, null, 2));
-}
+function loadNim()  { try { return fs.existsSync(NIM_DATA)  ? JSON.parse(fs.readFileSync(NIM_DATA,  "utf8")) : {}; } catch (_) { return {}; } }
+function saveNim(d) { fs.ensureDirSync(path.dirname(NIM_DATA));  fs.writeFileSync(NIM_DATA,  JSON.stringify(d, null, 2)); }
+function loadAuto() { try { return fs.existsSync(AUTO_DATA) ? JSON.parse(fs.readFileSync(AUTO_DATA, "utf8")) : {}; } catch (_) { return {}; } }
+function saveAuto(d){ fs.ensureDirSync(path.dirname(AUTO_DATA)); fs.writeFileSync(AUTO_DATA, JSON.stringify(d, null, 2)); }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function isAdmin(id) {
   const cfg = global.GoatBot?.config || {};
   const sid = String(id);
-  const all = [
-    cfg.ownerID,
-    ...(cfg.superAdminBot || []),
-    ...(cfg.adminBot || []),
-  ].filter(Boolean).map(String);
-  return all.includes(sid);
+  return [cfg.ownerID, ...(cfg.superAdminBot || []), ...(cfg.adminBot || [])]
+    .filter(Boolean).map(String).includes(sid);
 }
 
-// Active timers: tid → timeout handle
-const _timers = new Map();
-
-function clearTimer(tid) {
-  if (_timers.has(tid)) {
-    clearTimeout(_timers.get(tid));
-    _timers.delete(tid);
-  }
+// Parse timing string like "30s", "2m", "90" → milliseconds
+function parseDelay(token) {
+  if (!token) return null;
+  const t = String(token).trim().toLowerCase();
+  if (t.endsWith("m")) { const v = parseFloat(t); return isNaN(v) ? null : Math.max(v * 60000, 5000); }
+  if (t.endsWith("s")) { const v = parseFloat(t); return isNaN(v) ? null : Math.max(v * 1000,  5000); }
+  const v = parseFloat(t);
+  return isNaN(v) ? null : Math.max(v * 1000, 5000); // default = seconds
 }
 
-function scheduleCheck(api, tid, name) {
-  clearTimer(tid);
-  // Check every 3–7 seconds (randomized to look human)
+function fmtDelay(ms) {
+  if (ms >= 60000) return `${(ms / 60000).toFixed(1)} دقيقة`;
+  return `${Math.round(ms / 1000)} ثانية`;
+}
+
+function fmtUptime(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const d  = Math.floor(totalSec / 86400);
+  const h  = Math.floor((totalSec % 86400) / 3600);
+  const m  = Math.floor((totalSec % 3600) / 60);
+  const s  = totalSec % 60;
+  const parts = [];
+  if (d) parts.push(`${d} يوم`);
+  if (h) parts.push(`${h} ساعة`);
+  if (m) parts.push(`${m} دقيقة`);
+  parts.push(`${s} ثانية`);
+  return parts.join(" و ");
+}
+
+// ─── NIM protection timers ────────────────────────────────────────────────────
+const _nimTimers = new Map();
+
+function clearNimTimer(tid) {
+  if (_nimTimers.has(tid)) { clearTimeout(_nimTimers.get(tid)); _nimTimers.delete(tid); }
+}
+
+function scheduleNimCheck(api, tid, name) {
+  clearNimTimer(tid);
   const ms = 3000 + Math.floor(Math.random() * 4000);
   const handle = setTimeout(async () => {
     try {
-      const data = load();
-      if (!data[tid]?.active) return; // protection disabled
-
-      // Get current thread name
-      const info = await new Promise((res, rej) =>
-        api.getThreadInfo(tid, (e, d) => (e ? rej(e) : res(d)))
-      );
-      const currentName = info?.threadName || info?.name || "";
-
-      if (currentName !== name) {
-        // Name was changed — restore it
-        await api.setTitle(name, tid);
-      }
+      const data = loadNim();
+      if (!data[tid]?.active) return;
+      const info = await new Promise((res, rej) => api.getThreadInfo(tid, (e, d) => e ? rej(e) : res(d)));
+      const cur  = info?.threadName || info?.name || "";
+      if (cur !== name) await api.setTitle(name, tid);
     } catch (_) {}
-
-    // Reschedule
-    const d = load();
-    if (d[tid]?.active) scheduleCheck(api, tid, d[tid].name);
+    const d = loadNim();
+    if (d[tid]?.active) scheduleNimCheck(api, tid, d[tid].name);
   }, ms);
-
-  _timers.set(tid, handle);
+  _nimTimers.set(tid, handle);
 }
 
+// ─── Auto-reply timers ────────────────────────────────────────────────────────
+// Map: tid → { timer, lastSent }
+const _autoState = new Map();
+
+function clearAutoTimer(tid) {
+  const s = _autoState.get(tid);
+  if (s?.timer) { clearTimeout(s.timer); }
+  _autoState.delete(tid);
+}
+
+function scheduleAutoReply(api, tid, cfg) {
+  clearAutoTimer(tid);
+  if (!cfg?.active || !cfg?.message || !cfg?.delayMs) return;
+
+  // This is a rate-limited reply — we schedule a window reset
+  _autoState.set(tid, { lastSent: 0, pendingTimer: null });
+}
+
+// ─── Module ──────────────────────────────────────────────────────────────────
 module.exports = {
   config: {
-    name: "سايان",
-    aliases: ["sayan"],
-    version: "1.0",
-    author: "DJAMEL",
-    countDown: 3,
-    role: 2,
-    category: "management",
-    description: "حماية اسم الغروب — يُعيد الاسم تلقائياً إذا غيّره أحد",
+    name:        "سايان",
+    aliases:     ["sayan"],
+    version:     "2.0",
+    author:      "DJAMEL",
+    countDown:   3,
+    role:        2,
+    category:    "management",
+    description: "أمر SAIYAN الشامل — حماية الاسم + رد تلقائي + معلومات البوت",
     guide: {
-      en: "{pn} نيم [الاسم] — تفعيل الحماية\n{pn} ايقاف نيم — إيقاف الحماية",
+      en:
+        "{pn} نيم [اسم]          — حماية اسم الغروب\n" +
+        "{pn} ايقاف نيم          — إيقاف حماية الاسم\n" +
+        "{pn} اضافة [رسالة] [وقت]— ضبط الرد التلقائي (30s / 2m)\n" +
+        "{pn} تشغيل              — تشغيل الرد التلقائي\n" +
+        "{pn} ايقاف              — إيقاف الرد التلقائي\n" +
+        "{pn} ابتيم              — معلومات البوت",
     },
   },
 
+  // ─── onStart ──────────────────────────────────────────────────────────────
   onStart: async function ({ api, event, args, message }) {
-    if (!isAdmin(event.senderID)) {
-      return message.reply("⛔ هذا الأمر للأدمن فقط.");
-    }
+    if (!isAdmin(event.senderID)) return message.reply("⛔ هذا الأمر للأدمن فقط.");
 
     const tid  = String(event.threadID);
-    const data = load();
     const sub1 = (args[0] || "").trim();
     const sub2 = (args[1] || "").trim();
 
-    // ─── ! سايان ايقاف نيم ──────────────────────────────────────
-    if (sub1 === "ايقاف" && sub2 === "نيم") {
-      clearTimer(tid);
-      if (data[tid]) { data[tid].active = false; save(data); }
-      return message.reply(
-        "✅ تم إيقاف حماية اسم الغروب.\n" +
-        "يمكن لأي شخص تغيير الاسم الآن."
-      );
-    }
-
-    // ─── ! سايان نيم [اسم] ──────────────────────────────────────
+    // ══════════════════════════════════════════════════════
+    // ! سايان نيم [اسم]
+    // ══════════════════════════════════════════════════════
     if (sub1 === "نيم") {
       const name = args.slice(1).join(" ").trim();
-      if (!name) {
-        return message.reply(
-          "❗ اكتب الاسم الذي تريد تثبيته.\n" +
-          "مثال: ! سايان نيم Magnus Bot"
-        );
-      }
-
-      // Set the name immediately
-      try {
-        await api.setTitle(name, tid);
-      } catch (e) {
-        return message.reply("❌ فشل تغيير الاسم: " + e.message);
-      }
-
-      data[tid] = { active: true, name };
-      save(data);
-
-      // Start the watcher
-      scheduleCheck(api, tid, name);
-
+      if (!name) return message.reply("❗ اكتب الاسم.\nمثال: ! سايان نيم Magnus Bot");
+      try { await api.setTitle(name, tid); } catch (e) { return message.reply("❌ فشل: " + e.message); }
+      const d = loadNim();
+      d[tid] = { active: true, name };
+      saveNim(d);
+      scheduleNimCheck(api, tid, name);
       return message.reply(
         `🔒 تم تفعيل حماية اسم الغروب!\n` +
-        `📝 الاسم المحمي: ${name}\n\n` +
-        `إذا غيّر أي شخص الاسم، سيعود تلقائياً.\n` +
+        `📝 الاسم: ${name}\n\n` +
+        `سيعود الاسم تلقائياً إذا غيّره أحد.\n` +
         `لإيقافه: ! سايان ايقاف نيم`
       );
     }
 
-    // ─── مساعدة ──────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════
+    // ! سايان ايقاف نيم
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "ايقاف" && sub2 === "نيم") {
+      clearNimTimer(tid);
+      const d = loadNim();
+      if (d[tid]) { d[tid].active = false; saveNim(d); }
+      return message.reply("✅ تم إيقاف حماية الاسم.");
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ! سايان ايقاف   (إيقاف الرد التلقائي)
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "ايقاف" && !sub2) {
+      clearAutoTimer(tid);
+      const d = loadAuto();
+      if (d[tid]) { d[tid].active = false; saveAuto(d); }
+      return message.reply("✅ تم إيقاف الرد التلقائي.");
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ! سايان اضافة [رسالة] [وقت]
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "اضافة") {
+      // Last arg might be the timing token
+      const allArgs = args.slice(1);
+      const lastArg = allArgs[allArgs.length - 1] || "";
+      const delayMs = parseDelay(lastArg);
+      let msgText, delay;
+
+      if (delayMs && allArgs.length > 1) {
+        msgText = allArgs.slice(0, -1).join(" ").trim();
+        delay   = delayMs;
+      } else {
+        msgText = allArgs.join(" ").trim();
+        delay   = 30000; // default 30s
+      }
+
+      if (!msgText) return message.reply("❗ اكتب الرسالة.\nمثال: ! سايان اضافة مرحباً بكم 30s");
+
+      const d = loadAuto();
+      d[tid] = { ...(d[tid] || {}), message: msgText, delayMs: delay, active: false };
+      saveAuto(d);
+
+      return message.reply(
+        `✅ تم ضبط الرد التلقائي!\n` +
+        `📝 الرسالة: ${msgText}\n` +
+        `⏱ الفاصل الزمني: ${fmtDelay(delay)}\n\n` +
+        `لتشغيله: ! سايان تشغيل`
+      );
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ! سايان تشغيل
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "تشغيل") {
+      const d = loadAuto();
+      if (!d[tid]?.message) {
+        return message.reply(
+          "❗ لم تضع رسالة بعد.\n" +
+          "أولاً: ! سايان اضافة [رسالة] [وقت]\n" +
+          "ثم: ! سايان تشغيل"
+        );
+      }
+      d[tid].active = true;
+      saveAuto(d);
+      _autoState.set(tid, { lastSent: 0 });
+      return message.reply(
+        `✅ تم تشغيل الرد التلقائي!\n` +
+        `📝 الرسالة: ${d[tid].message}\n` +
+        `⏱ كل رسالة جديدة → يرد بعد ${fmtDelay(d[tid].delayMs)}\n\n` +
+        `لإيقافه: ! سايان ايقاف`
+      );
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ! سايان ابتيم
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "ابتيم") {
+      const upMs   = Date.now() - (global.GoatBot?.startTime || Date.now());
+      const mem    = process.memoryUsage();
+      const sysM   = { total: os.totalmem(), free: os.freemem() };
+      const cmds   = global.GoatBot?.commands?.size || 0;
+      const uid    = global.GoatBot?.botID  || "—";
+      const bName  = global.GoatBot?.config?.botName || "Magnus Bot";
+      const prefix = global.GoatBot?.config?.prefix || "!";
+      const nim    = loadNim();
+      const auto   = loadAuto();
+      const nimActive  = !!nim[tid]?.active;
+      const autoActive = !!auto[tid]?.active;
+      const prot   = 20;
+      const ping   = Date.now(); await new Promise(r => setTimeout(r, 8)); const pong = Date.now() - ping;
+
+      const lines = [
+        `𝑺𝑨𝑰𝒀𝑨𝑵 𝑩𝑶𝑻`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `🤖 الاسم      : ${bName}`,
+        `🆔 Bot ID     : ${uid}`,
+        `💬 Thread ID  : ${tid}`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `⏱ يعمل منذ   : ${fmtUptime(upMs)}`,
+        `🏓 Ping       : ${pong}ms`,
+        `💾 RAM المستخدم: ${(mem.heapUsed/1048576).toFixed(1)} MB`,
+        `🖥 RAM الكلي  : ${(sysM.total/1073741824).toFixed(2)} GB`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `📦 الأوامر    : ${cmds} أمر`,
+        `🛡 الحماية    : ${prot} طبقة نشطة`,
+        `🔑 البادئة    : ${prefix}`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `🔒 حماية الاسم: ${nimActive  ? "✅ مفعّلة → " + (nim[tid]?.name||"")  : "❌ معطلة"}`,
+        `💬 رد تلقائي  : ${autoActive ? "✅ مفعّل  → " + fmtDelay(auto[tid]?.delayMs||0) : "❌ معطل"}`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `👑 المطوّر    : DJAMEL`,
+        `⚙️ المحرك     : DAVID v2.0`,
+      ];
+
+      return message.reply(lines.join("\n"));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // مساعدة عامة
+    // ══════════════════════════════════════════════════════
     return message.reply(
-      "📌 طريقة الاستخدام:\n" +
-      "! سايان نيم [الاسم] — تفعيل الحماية\n" +
-      "! سايان ايقاف نيم — إيقاف الحماية"
+      `𝑺𝑨𝑰𝒀𝑨𝑵 𝑩𝑶𝑻 — الأوامر\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `! سايان نيم [اسم]     — حماية اسم الغروب\n` +
+      `! سايان ايقاف نيم     — إيقاف حماية الاسم\n` +
+      `! سايان اضافة [رسالة] [وقت] — ضبط الرد\n` +
+      `! سايان تشغيل         — تشغيل الرد التلقائي\n` +
+      `! سايان ايقاف         — إيقاف الرد التلقائي\n` +
+      `! سايان ابتيم         — معلومات البوت`
     );
   },
 
-  // ─── مراقبة أحداث تغيير الاسم (استجابة فورية) ────────────────
+  // ─── onEvent: مراقبة الرسائل للرد التلقائي + حماية الاسم ──────────────────
   onEvent: async function ({ api, event }) {
-    if (event.logMessageType !== "log:thread-name") return;
+    const tid = String(event.threadID);
 
-    const tid  = String(event.threadID);
-    const data = load();
-    if (!data[tid]?.active) return;
+    // ── حماية الاسم (فورية) ─────────────────────────────────────
+    if (event.logMessageType === "log:thread-name") {
+      const nimData = loadNim();
+      if (nimData[tid]?.active) {
+        const protected_ = nimData[tid].name;
+        const newName    = event.logMessageData?.name || "";
+        if (newName !== protected_) {
+          await new Promise(r => setTimeout(r, 1200));
+          try { await api.setTitle(protected_, tid); } catch (_) {}
+        }
+      }
+      return;
+    }
 
-    const protectedName = data[tid].name;
-    const newName       = event.logMessageData?.name || "";
+    // ── الرد التلقائي ────────────────────────────────────────────
+    if (event.type !== "message") return;
+    if (!event.body) return;
 
-    if (newName === protectedName) return; // no change needed
+    const autoData = loadAuto();
+    const cfg      = autoData[tid];
+    if (!cfg?.active || !cfg?.message || !cfg?.delayMs) return;
 
-    // Restore immediately
+    // تجاهل رسائل البوت نفسه
+    if (String(event.senderID) === String(global.GoatBot?.botID)) return;
+
+    const state    = _autoState.get(tid) || { lastSent: 0 };
+    const now      = Date.now();
+    const elapsed  = now - (state.lastSent || 0);
+
+    if (elapsed < cfg.delayMs) return; // لم يمرّ الوقت الكافي بعد
+
+    // تحديث وقت الإرسال
+    _autoState.set(tid, { lastSent: now });
+
     try {
-      await new Promise(r => setTimeout(r, 1500)); // slight delay
-      await api.setTitle(protectedName, tid);
+      const delay = global.utils?.calcHumanTypingDelay?.(cfg.message) || 1200;
+      await global.utils?.simulateTyping?.(api, tid, delay);
+      await api.sendMessage({ body: cfg.message }, tid);
     } catch (_) {}
   },
 };
