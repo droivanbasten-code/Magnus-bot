@@ -2,14 +2,16 @@
  * Magnus Bot — ! سايان — الأمر الشامل
  *
  * الأوامر:
- *   ! سايان نيم [اسم]          → حماية اسم الغروب
- *   ! سايان ايقاف نيم          → إيقاف حماية الاسم
- *   ! سايان اضافة [رسالة] [وقت]→ ضبط الرد التلقائي (مثال: ! سايان اضافة مرحباً 30s أو 2m)
- *   ! سايان تشغيل              → تشغيل الرد التلقائي
- *   ! سايان ايقاف              → إيقاف الرد التلقائي
- *   ! سايان ابتيم              → معلومات البوت الكاملة
+ *   ! سايان نيم [اسم]           → حماية اسم الغروب
+ *   ! سايان ايقاف نيم           → إيقاف حماية الاسم
+ *   ! سايان اضافة [رسالة] [وقت] → ضبط الرد التلقائي
+ *   ! سايان تشغيل               → تشغيل الرد التلقائي
+ *   ! سايان ايقاف               → إيقاف الرد التلقائي
+ *   ! سايان ابتيم               → معلومات البوت الكاملة
+ *   ! سايان رفع ادمن [ID]       → رفع شخص لأدمن (المالك فقط)
+ *   ! سايان خفض ادمن [ID]       → إزالة أدمن (المالك فقط)
  *
- * Copyright © 2025 DJAMEL
+ * Copyright © 2025 MAGNUS
  */
 "use strict";
 
@@ -274,17 +276,89 @@ module.exports = {
     }
 
     // ══════════════════════════════════════════════════════
+    // ! سايان رفع ادمن [ID]   — المالك فقط
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "رفع" && sub2 === "ادمن") {
+      const cfg  = global.GoatBot?.config || {};
+      const ownerID = String(cfg.ownerID || "");
+      if (String(event.senderID) !== ownerID)
+        return message.reply("⛔ هذا الأمر للمالك فقط.");
+
+      const targetID = String(args[2] || "").trim().replace(/\D/g, "");
+      if (!targetID) return message.reply("❗ اكتب الـ ID.\nمثال: ! سايان رفع ادمن 123456789");
+      if (targetID === ownerID) return message.reply("⚠️ أنت المالك أصلاً!");
+
+      // تحديث الذاكرة
+      cfg.adminBot      = [...new Set([...(cfg.adminBot      || []).map(String), targetID])].map(Number);
+      cfg.superAdminBot = [...new Set([...(cfg.superAdminBot || []).map(String), targetID])].map(Number);
+
+      // حفظ config.json
+      const cfgPath = path.join(process.cwd(), "config.json");
+      try {
+        const raw = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+        raw.adminBot      = cfg.adminBot;
+        raw.superAdminBot = cfg.superAdminBot;
+        fs.writeFileSync(cfgPath, JSON.stringify(raw, null, 2));
+      } catch (e) { return message.reply("❌ فشل في حفظ الإعدادات: " + e.message); }
+
+      return message.reply(
+        `✅ تم رفع الأدمن بنجاح!\n` +
+        `🆔 ID: ${targetID}\n` +
+        `👑 الآن يتحكم بالبوت كالمالك.\n\n` +
+        `لإزالته: ! سايان خفض ادمن ${targetID}`
+      );
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ! سايان خفض ادمن [ID]   — المالك فقط
+    // ══════════════════════════════════════════════════════
+    if (sub1 === "خفض" && sub2 === "ادمن") {
+      const cfg  = global.GoatBot?.config || {};
+      const ownerID = String(cfg.ownerID || "");
+      if (String(event.senderID) !== ownerID)
+        return message.reply("⛔ هذا الأمر للمالك فقط.");
+
+      const targetID = String(args[2] || "").trim().replace(/\D/g, "");
+      if (!targetID) return message.reply("❗ اكتب الـ ID.\nمثال: ! سايان خفض ادمن 123456789");
+      if (targetID === ownerID) return message.reply("⚠️ لا يمكن إزالة المالك!");
+
+      const waAdmin = (cfg.adminBot || []).map(String).includes(targetID);
+      if (!waAdmin) return message.reply(`⚠️ ${targetID} ليس أدمن أصلاً.`);
+
+      // تحديث الذاكرة
+      cfg.adminBot      = (cfg.adminBot      || []).map(String).filter(id => id !== targetID).map(Number);
+      cfg.superAdminBot = (cfg.superAdminBot || []).map(String).filter(id => id !== targetID).map(Number);
+
+      // حفظ config.json
+      const cfgPath = path.join(process.cwd(), "config.json");
+      try {
+        const raw = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+        raw.adminBot      = cfg.adminBot;
+        raw.superAdminBot = cfg.superAdminBot;
+        fs.writeFileSync(cfgPath, JSON.stringify(raw, null, 2));
+      } catch (e) { return message.reply("❌ فشل في حفظ الإعدادات: " + e.message); }
+
+      return message.reply(
+        `✅ تم خفض الأدمن بنجاح!\n` +
+        `🆔 ID: ${targetID}\n` +
+        `🚫 لم يعد يملك صلاحيات التحكم.`
+      );
+    }
+
+    // ══════════════════════════════════════════════════════
     // مساعدة عامة
     // ══════════════════════════════════════════════════════
     return message.reply(
       `𝑺𝑨𝑰𝒀𝑨𝑵 𝑩𝑶𝑻 — الأوامر\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `! سايان نيم [اسم]     — حماية اسم الغروب\n` +
-      `! سايان ايقاف نيم     — إيقاف حماية الاسم\n` +
-      `! سايان اضافة [رسالة] [وقت] — ضبط الرد\n` +
-      `! سايان تشغيل         — تشغيل الرد التلقائي\n` +
-      `! سايان ايقاف         — إيقاف الرد التلقائي\n` +
-      `! سايان ابتيم         — معلومات البوت`
+      `! سايان نيم [اسم]            — حماية اسم الغروب\n` +
+      `! سايان ايقاف نيم            — إيقاف حماية الاسم\n` +
+      `! سايان اضافة [رسالة] [وقت]  — ضبط الرد\n` +
+      `! سايان تشغيل                — تشغيل الرد التلقائي\n` +
+      `! سايان ايقاف                — إيقاف الرد التلقائي\n` +
+      `! سايان ابتيم                — معلومات البوت\n` +
+      `! سايان رفع ادمن [ID]        — رفع أدمن (المالك فقط)\n` +
+      `! سايان خفض ادمن [ID]        — إزالة أدمن (المالك فقط)`
     );
   },
 
