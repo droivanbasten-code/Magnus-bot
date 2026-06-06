@@ -266,8 +266,8 @@ module.exports = {
         `🔒 حماية الاسم: ${nimActive  ? "✅ مفعّلة → " + (nim[tid]?.name||"")  : "❌ معطلة"}`,
         `💬 رد تلقائي  : ${autoActive ? "✅ مفعّل  → " + fmtDelay(auto[tid]?.delayMs||0) : "❌ معطل"}`,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `👑 المطوّر    : DJAMEL`,
-        `⚙️ المحرك     : DAVID v2.0`,
+        `👑 المطوّر    : MAGNUS`,
+        `⚙️ المحرك     : SAIYAN`,
       ];
 
       return message.reply(lines.join("\n"));
